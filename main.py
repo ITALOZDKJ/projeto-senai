@@ -7,6 +7,8 @@ from zoneinfo import ZoneInfo
 from datetime import datetime
 from sqlalchemy import create_engine
 
+def mostrar_linha():
+  print('=' *60)
 
 def obter_conexao():
     return pymysql.connect(
@@ -43,13 +45,13 @@ comanda = []
 
 print(cardapio.to_string(index=False))
 print(f'''
-      {60*'='}
+      {mostrar_linha()}
       Selecione uma opção do cardápio, ou umas das opções a seguir:
       [0]  para ver a comanda
       [-1] para fechar o pedido
       [-2] para cancelar o pedido
       [-3] para remover um item
-      {60*'='}
+      {mostrar_linha()}
 ''')
 con.close()
 
@@ -140,13 +142,13 @@ while True:
           item_rem = int(item_rem)
           if item_rem == -1:
             print(f'''
-                      {60*'='}
+                      {mostrar_linha()}
                       Selecione uma opção do cardápio, ou umas das opções a seguir:
                       [0]  para ver a comanda
                       [-1] para fechar o pedido
                       [-2] para cancelar o pedido
                       [-3] para remover um item
-                      {60*'='}
+                      {mostrar_linha()}
                   ''')
             break
           elif item_rem not in range(1,len(comanda)+1):
