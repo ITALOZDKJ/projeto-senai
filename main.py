@@ -1,24 +1,16 @@
 #Execução do código
 
 import pymysql.cursors
-
+import funcoes
 import pandas as pd
 from zoneinfo import ZoneInfo
 from datetime import datetime
 from sqlalchemy import create_engine
 
-def mostrar_linha():
-  print('=' *60)
+#Funções
 
-def obter_conexao():
-    return pymysql.connect(
-        host="172.16.22.76",
-        user="admin",
-        password="senaiead",
-        database="cafeteria",
-        # Retorna os resultados em formato de dicionário, facilitando consultas
-        cursorclass=pymysql.cursors.DictCursor,)
-con = obter_conexao()
+
+con = funcoes.obter_conexao()
 cur = con.cursor()
 
 engine = create_engine(
@@ -44,45 +36,35 @@ else:
 comanda = []
 
 print(cardapio.to_string(index=False))
-print(f'''
-      {mostrar_linha()}
-      Selecione uma opção do cardápio, ou umas das opções a seguir:
-      [0]  para ver a comanda
-      [-1] para fechar o pedido
-      [-2] para cancelar o pedido
-      [-3] para remover um item
-      {mostrar_linha()}
-''')
+
+funcoes.mostrar_menu()
+
 con.close()
 
-opcoes = [-3.-2,-1,0]
 while True:
+
   pedido = input('Digite o item: ')
+
   try:
-    pedido = int(pedido)
+      pedido = int(pedido)
 
   except:
-    print('Opção inválida')
-    continue
-  pedido = int(pedido)
+      print('Opção inválida')
+      continue
+
+  
+
+  
+
   if pedido-1 in list(cardapio.index):
     preco = cardapio.loc[pedido-1,'preco']
     nome = cardapio.loc[pedido-1,'nome']
-    ja_esta = False
-    for pedido_item in comanda: # Renamed 'pedido' variable to avoid shadowing
-      if pedido_item['Nome'] == nome:
-        pedido_item['Quantidade'] += 1
-        pedido_item['Valor'] += preco
-        ja_esta = True
-    if not ja_esta:
-      comanda.append({'Nome': nome, 'Quantidade': 1, 'Valor': preco, 'Cod Comanda': codigo_comanda })
+    funcoes.adicionar_item(comanda, nome, preco, codigo_comanda)
+
+
+
   elif pedido == 0:
-    if len(comanda) == 0:
-      print('Não há pedidos no momento.')
-    else:
-      comanda_df = pd.DataFrame(comanda)
-      print(comanda_df)
-      print(f'O valor da conta está em R${comanda_df["Valor"].sum()}')
+    funcoes.mostrar_comanda(comanda)
 
   elif pedido == -1:
     if len(comanda) == 0:
@@ -92,7 +74,7 @@ while True:
       print('Fechando pedido...')
       comanda_df = pd.DataFrame(comanda) # Renamed 'comanda' variable to avoid shadowing
       print(comanda_df)
-      con = obter_conexao()
+      con = funcoes.obter_conexao()
       cur = con.cursor()
       total = comanda_df['Valor'].sum()
       data = datetime.now(ZoneInfo('America/Sao_Paulo')).strftime("%d/%m/%Y")
@@ -141,15 +123,7 @@ while True:
             continue
           item_rem = int(item_rem)
           if item_rem == -1:
-            print(f'''
-                      {mostrar_linha()}
-                      Selecione uma opção do cardápio, ou umas das opções a seguir:
-                      [0]  para ver a comanda
-                      [-1] para fechar o pedido
-                      [-2] para cancelar o pedido
-                      [-3] para remover um item
-                      {mostrar_linha()}
-                  ''')
+            funcoes.mostrar_menu()
             break
           elif item_rem not in range(1,len(comanda)+1):
             print('Opção inválida')
