@@ -72,32 +72,10 @@ while True:
       continue
     else:
       print('Fechando pedido...')
-      comanda_df = pd.DataFrame(comanda) # Renamed 'comanda' variable to avoid shadowing
-      print(comanda_df)
-      con = funcoes.obter_conexao()
-      cur = con.cursor()
-      total = comanda_df['Valor'].sum()
-      data = datetime.now(ZoneInfo('America/Sao_Paulo')).strftime("%d/%m/%Y")
-      hora = datetime.now(ZoneInfo('America/Sao_Paulo')).strftime("%H:%M")
-      print(f'O valor da conta ficou em R${total}')
-      with con.cursor() as cur:
-        cur.execute("""
-                  INSERT INTO ComandaCliente (Valor, Data, Hora, CodigoComanda)
-                  VALUES (%s, %s, %s,%s)""",
-                  (total, data, hora, codigo_comanda)
-
-          )
-      for item, linha in comanda_df.iterrows():
-        with con.cursor() as cur:
-          cur.execute(
-              '''INSERT INTO Comanda (Nome, Quantidade, Valor_Unitario, Codigo_Pedido) VALUES (%s, %s, %s,%s)''',
-              (linha['Nome'], linha['Quantidade'], linha['Valor']/linha['Quantidade'], linha['Cod Comanda'])
-          )
       
+      funcoes.fechar_comanda(comanda, codigo_comanda)
+      break
 
-    con.commit()
-    con.close()
-    break
 
   elif pedido == -2:
     print('Pedido cancelado.')
@@ -105,15 +83,25 @@ while True:
     break
 
   elif pedido == -3:
-      if len(comanda) == 0:
-        print('Não há pedidos no momento.')
-      elif len(comanda) == 1:
+    if len(comanda) == 0:
+      print('Não há pedidos no momento.')
+    elif len(comanda) == 1:
+      if comanda[0]['Quantidade'] == 1:
         comanda.pop()
-        print('Último item removido')
+        print('Item removido')
       else:
+        
         while True:
+
+          print(f'{"ITEM":<6}{"PRODUTO":<30}{"QTD":<5}')
+          print('=' * 41)
+
           for item, linha in enumerate(comanda):
-            print(f'{item+1} - {linha["Nome"]}')
+              print(
+                  f'{item+1:<6}'
+                  f'{linha["Nome"]:<30}'
+                  f'{linha["Quantidade"]:<5}'
+              )
           item_rem = input('Digite o numero do item a ser removido ou -1 para retornar ao menu: ')
 
           try:
@@ -121,7 +109,6 @@ while True:
           except:
             print('Opção inválida')
             continue
-          item_rem = int(item_rem)
           if item_rem == -1:
             funcoes.mostrar_menu()
             break

@@ -64,4 +64,11 @@ while True:
                 break 
 
     elif opc == 1:
+        cod = input('Insira a comanda a ser alterada ou 0 para retornar ao menu: ')
+        try:
+                int(cod)
+            except:
+                print('Opção inválida!')
+                continue
+        
         

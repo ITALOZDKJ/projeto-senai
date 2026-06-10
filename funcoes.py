@@ -1,5 +1,4 @@
 import pymysql.cursors
-
 import pandas as pd
 from zoneinfo import ZoneInfo
 from datetime import datetime
@@ -52,3 +51,32 @@ def mostrar_comanda(comanda):
 
     print(comanda_df)
     print(f'O valor da conta está em R${comanda_df["Valor"].sum()}')
+
+
+
+def fechar_comanda(comanda, codigo_comanda):
+        comanda_df = pd.DataFrame(comanda) 
+        print(comanda_df)
+        con = obter_conexao()
+        total = comanda_df['Valor'].sum()
+        data = datetime.now(ZoneInfo('America/Sao_Paulo')).strftime("%d/%m/%Y")
+        hora = datetime.now(ZoneInfo('America/Sao_Paulo')).strftime("%H:%M")
+        print(f'O valor da conta ficou em R${total}')
+        with con.cursor() as cur:
+          cur.execute("""
+                    INSERT INTO ComandaCliente (Valor, Data, Hora, CodigoComanda)
+                    VALUES (%s, %s, %s,%s)""",
+                    (total, data, hora, codigo_comanda)
+
+            )
+        for item, linha in comanda_df.iterrows():
+          with con.cursor() as cur:
+            cur.execute(
+                '''INSERT INTO Comanda (Nome, Quantidade, Valor_Unitario, Codigo_Pedido) VALUES (%s, %s, %s,%s)''',
+                (linha['Nome'], linha['Quantidade'], linha['Valor']/linha['Quantidade'], linha['Cod Comanda'])
+            )
+        
+
+        con.commit()
+        con.close()
+
