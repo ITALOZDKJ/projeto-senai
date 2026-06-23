@@ -1,0 +1,333 @@
+from datetime import datetime
+import os  # <-- NOVO: Para limpar a tela do terminal
+from sqlalchemy import create_engine, text
+from zoneinfo import ZoneInfo
+import funcoes
+import pandas as pd
+import pymysql.cursors
+
+con = funcoes.obter_conexao()
+cur = con.cursor()
+
+engine = create_engine(
+    "mysql+pymysql://admin:senaiead@172.16.22.76/ferragens_do_ze"
+)
+
+
+# NOVA FUNÇÃO: Limpa o terminal para focar a atenção do usuário
+def limpar_tela():
+    os.system("cls" if os.name == "nt" else "clear")
+
+
+# NOVA FUNÇÃO: Recarrega os dados para que o Pandas sempre veja o estoque atualizado
+def atualizar_estoque_memoria():
+    global estoque, ids_validos
+    estoque = pd.read_sql_query("SELECT * FROM Produtos", engine)
+    ids_validos = estoque["Id"].tolist()
+
+
+# Inicializa os dados
+atualizar_estoque_memoria()
+
+
+def menu():
+    limpar_tela()
+    print(f"""
+        {funcoes.mostrar_linha()}
+        Ferragens do Zé - Controle de Estoque
+        {funcoes.mostrar_linha()}
+        [1] para adicionar item no estoque
+        [2] para remover item do estoque
+        [3] para adicionar um novo item no estoque
+        [4] para sair do programa
+        {funcoes.mostrar_linha()}
+    """)
+
+
+menu()
+while True:
+    pag1 = input("Selecione a opção desejada: ")
+
+    try:
+        pag1 = int(pag1)
+    except ValueError:
+        print("Opção inválida! Digite um número.")
+        continue
+
+    # ----------------------------------------
+    # OPÇÃO 1: ADICIONAR ESTOQUE
+    # ----------------------------------------
+    if pag1 == 1:
+        while True:
+            limpar_tela()
+            print(f"--- ADICIONAR AO ESTOQUE ---\n")
+            print(estoque.to_string(index=False))
+            print(f"\n{funcoes.mostrar_linha()}")
+
+            id_add = input(
+                "Selecione o Id do item ou -1 para retornar ao menu: "
+            )
+
+            try:
+                id_add = int(id_add)
+            except ValueError:
+                input("ID inválido! Pressione Enter para tentar novamente...")
+                continue
+
+            if id_add == -1:
+                menu()
+                break
+
+            if id_add not in ids_validos:
+                print(f"ID {id_add} não encontrado no estoque.")
+                input("Pressione Enter para tentar novamente...")
+                continue
+
+            # Pega o nome do produto para o usuário ter certeza do que está fazendo
+            nome_produto = estoque.loc[estoque["Id"] == id_add, "Nome"].values[0]
+
+            while True:
+                print(f"\n-> Produto Selecionado: {nome_produto}")
+                add = input(
+                    "Digite a quantidade a ser adicionada ou -1 para retornar: "
+                )
+                try:
+                    add = int(add)
+                except ValueError:
+                    print("Por favor, digite um número válido.")
+                    continue
+
+                if add == -1:
+                    break
+
+                if add <= 0:
+                    print("A quantidade deve ser maior que zero!")
+                    continue
+
+                qtd_atual = estoque.loc[estoque["Id"] == id_add, "Quantidade"].values[0]
+                nova_qtd = qtd_atual + add
+
+                sql = text(
+                    "UPDATE Produtos SET Quantidade = :nova_qtd WHERE Id = :id_add"
+                )
+                valores = {"nova_qtd": nova_qtd, "id_add": id_add}
+
+                with engine.begin() as conexao:
+                    conexao.execute(sql, valores)
+
+                # CRUCIAL: Atualiza a memória do Pandas com o novo valor do banco
+                atualizar_estoque_memoria()
+
+                print(f"\nSucesso! {add} unidades adicionadas a '{nome_produto}'.")
+                input("Pressione Enter para continuar...")
+                break
+
+    # ----------------------------------------
+    # OPÇÃO 2: REMOVER ESTOQUE
+    # ----------------------------------------
+    elif pag1 == 2:
+        while True:
+            limpar_tela()
+            print(f"--- REMOVER DO ESTOQUE ---\n")
+            print(estoque.to_string(index=False))
+            print(f"\n{funcoes.mostrar_linha()}")
+
+            id_rmv = input(
+                "Selecione o Id do item ou -1 para retornar ao menu: "
+            )
+
+            try:
+                id_rmv = int(id_rmv)
+            except ValueError:
+                input("ID inválido! Pressione Enter para tentar novamente...")
+                continue
+
+            if id_rmv == -1:
+                menu()
+                break
+
+            if id_rmv not in ids_validos:
+                print(f"ID {id_rmv} não encontrado no estoque.")
+                input("Pressione Enter para tentar novamente...")
+                continue
+
+            nome_produto = estoque.loc[estoque["Id"] == id_rmv, "Nome"].values[0]
+
+            while True:
+                print(f"\n-> Produto Selecionado: {nome_produto}")
+                remove = input(
+                    "Digite a quantidade a ser removida ou -1 para retornar: "
+                )
+                try:
+                    remove = int(remove)
+                except ValueError:
+                    print("Por favor, digite um número válido.")
+                    continue
+
+                if remove == -1:
+                    break
+
+                if remove <= 0:
+                    print("A quantidade deve ser maior que zero!")
+                    continue
+
+                qtd_atual = estoque.loc[estoque["Id"] == id_rmv, "Quantidade"].values[0]
+
+                if qtd_atual - remove < 0:
+                    print(f"Saldo insuficiente! Estoque atual de '{nome_produto}' é apenas {qtd_atual} unidades.")
+                    continue
+
+                nova_qtd = qtd_atual - remove
+                sql = text(
+                    "UPDATE Produtos SET Quantidade = :nova_qtd WHERE Id = :id_rmv"
+                )
+                valores = {"nova_qtd": nova_qtd, "id_rmv": id_rmv}
+
+                with engine.begin() as conexao:
+                    conexao.execute(sql, valores)
+
+                atualizar_estoque_memoria()
+
+                print(f"\nSucesso! {remove} unidades removidas de '{nome_produto}'.")
+                input("Pressione Enter para continuar...")
+                break
+    
+    # ----------------------------------------
+    # OPÇÃO 3: CADASTRAR NOVO PRODUTO
+    # ----------------------------------------
+    elif pag1 == 3:
+        salvou = False # Sinalizador para desarmar os loops externos
+        while True:
+            limpar_tela()
+            print(f"--- CADASTRAR NOVO PRODUTO ---\n")
+            nome = input('Digite o nome do item ou -1 para retornar: ').strip()
+            if nome == '-1':
+                menu()
+                break
+            if not nome:
+                print("O nome não pode ficar em branco!")
+                input("Pressione Enter para tentar novamente...")
+                continue
+                
+            while True:
+                preco = input('Digite o preço ou -1 para retornar: ').strip()
+                if preco == '-1':
+                    break
+                try:
+                    preco = float(preco.replace(',', '.'))
+                except ValueError:
+                    print("Digite apenas números e use ponto para centavos (Ex: 12.50).")
+                    input("Aperte Enter para tentar novamente... ")
+                    continue
+                
+                categorias = pd.Series(estoque['Categoria'].unique())
+                
+                while True:
+                    limpar_tela()
+                    print("--- CATEGORIAS DISPONÍVEIS ---")
+                    print(categorias.to_string(index=True))
+                    print(funcoes.mostrar_linha())
+                    
+                    id_categoria = input('Selecione a categoria do produto ou -1 pra retornar: ').strip()
+                    if id_categoria == '-1':
+                        break
+                    if not id_categoria:
+                        print("A categoria não pode ficar em branco!")
+                        input("Pressione Enter para tentar novamente...")
+                        continue
+                        
+                    try:
+                        id_categoria = int(id_categoria)
+                        if id_categoria < 0 or id_categoria >= len(categorias):
+                            print("Número de categoria inválido!")
+                            input("Pressione Enter para tentar novamente...")
+                            continue
+                    except ValueError:
+                        print("Por favor, digite um número válido.")
+                        input("Pressione Enter para continuar...")
+                        continue
+
+                    categoria = categorias.iloc[id_categoria]
+                    
+                    while True:
+                        limpar_tela()
+                        print(f'CATEGORIA ESCOLHIDA: {categoria}\n')
+                        quantidade = input('Digite a quantidade ou -1 para retornar: ').strip()
+                        if quantidade == '-1':
+                            break
+                        try:
+                            quantidade = int(quantidade)
+                        except ValueError:
+                            print('Quantidade inválida!')
+                            input('Pressione Enter para tentar novamente...')
+                            continue
+                        if quantidade < 0:
+                            print('A quantidade deve ser igual ou superior a 0!')
+                            input('Pressione Enter para tentar novamente...')
+                            continue
+                        
+                        # 4. TELA DE CONFIRMAÇÃO EM MENU
+                        limpar_tela()
+                        print(f"""--- CONFIRMAÇÃO DOS DADOS ---
+PRODUTO:   {nome}
+PREÇO:     R$ {preco:.2f}
+CATEGORIA: {categoria}
+VOLUME:    {quantidade}
+{funcoes.mostrar_linha()}
+[1] Confirmar e Salvar no Sistema
+[2] Cancelar e Voltar
+{funcoes.mostrar_linha()}""")
+                        
+                        opcao_final = input("Selecione a opção desejada: ").strip()
+                        
+                        if opcao_final == "1":
+                            sql_insert = text("""
+                                INSERT INTO Produtos (Nome, Preco, Categoria, Quantidade)
+                                VALUES (:nome, :preco, :categoria, :quantidade)
+                            """)
+                            
+                            valores_insert = {
+                                "nome": nome,
+                                "preco": preco,
+                                "categoria": categoria,
+                                "quantidade": quantidade
+                            }
+                            
+                            # Executa usando a mesma engine das opções 1 e 2
+                            with engine.begin() as conexao:
+                                conexao.execute(sql_insert, valores_insert)
+                            
+                            
+                            
+                            atualizar_estoque_memoria()
+                            
+                            print("\n✔ Produto adicionado com sucesso!")
+                            input("Pressione Enter para voltar ao menu principal...")
+                            salvou = True
+                            break
+                            
+                        elif opcao_final == "2":
+                            print("\n❌ Cadastro cancelado pelo usuário.")
+                            input("Pressione Enter para voltar...")
+                            salvou = True # Também sai de tudo para voltar ao menu limpo
+                            break
+                        else:
+                            print("Opção inválida!")
+                            input("Pressione Enter para tentar novamente...")
+                            continue
+                    if salvou: break
+                if salvou: break
+            if salvou: 
+                menu()
+                break
+                
+    # ----------------------------------------
+    # OPÇÃO 4: SAIR DO PROGRAMA
+    # ----------------------------------------
+    elif pag1 == 4:
+        print('Saindo do programa...')
+        break
+    else:
+        print("Opção inválida!")
+        input("Pressione Enter para tentar novamente...")
+        menu()

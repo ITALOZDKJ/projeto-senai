@@ -5,7 +5,7 @@ from sqlalchemy import create_engine
 from datetime import datetime
 from zoneinfo import ZoneInfo
 engine = create_engine(
-    "mysql+pymysql://admin:senaiead@172.16.22.76/cafeteria"
+    "mysql+pymysql://admin:senaiead@172.16.22.76/ferragens_do_ze"
 )
 
 
@@ -28,8 +28,13 @@ con = obter_conexao()
 
 teste = 5
 
-comanda = pd.read_sql_query("""
-                                
-                                SELECT * FROM 
-                                
-                                """)        
+estoque = pd.read_sql_query(
+                                        "SELECT * FROM Produtos",
+                                        engine
+                                    )       
+
+categorias = pd.DataFrame(estoque['Categoria'].unique())
+
+puxa = categorias.iloc[2].item()
+
+print(puxa)
