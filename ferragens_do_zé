@@ -1,7 +1,6 @@
 from datetime import datetime
 import os  # <-- NOVO: Para limpar a tela do terminal
 from sqlalchemy import create_engine, text
-from zoneinfo import ZoneInfo
 import funcoes
 import pandas as pd
 import pymysql.cursors
