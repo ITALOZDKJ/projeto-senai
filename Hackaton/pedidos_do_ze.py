@@ -2,7 +2,7 @@
 from datetime import datetime
 import os  # Biblioteca utilizada para interagir com o sistema operacional (limpeza de terminal)
 from sqlalchemy import create_engine, text  # Usado para criar conexões e estruturar comandos SQL de forma segura
-import funcoes  # Módulo personalizado contendo funções utilitárias do sistema
+import Hackaton.funcoes as funcoes  # Módulo personalizado contendo funções utilitárias do sistema
 import pandas as pd  # Usado para manipular e visualizar tabelas de dados na memória
 import pymysql.cursors  # Driver para realizar a ponte de comunicação com o banco MySQL
 
