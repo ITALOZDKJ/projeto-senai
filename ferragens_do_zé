@@ -1,34 +1,41 @@
-from datetime import datetime
-import os  # <-- NOVO: Para limpar a tela do terminal
-from sqlalchemy import create_engine, text
-import funcoes
-import pandas as pd
-import pymysql.cursors
 
+from datetime import datetime
+import os  # Biblioteca usada para interagir com o sistema operacional (ex: limpar terminal)
+from sqlalchemy import create_engine, text  # Usado para criar a conexão e formatar queries SQL de forma segura
+import funcoes  # Módulo personalizado contendo funções auxiliares (ex: mostrar_linha)
+import pandas as pd  # Usado para manipular e visualizar os dados em formato de DataFrame
+import pymysql.cursors  # Driver de conexão para bancos MySQL
+
+# Cria a conexão padrão via PyMySQL (caso use em funções externas)
 con = funcoes.obter_conexao()
 cur = con.cursor()
 
+# Configura o motor de conexão do SQLAlchemy para o banco "ferragens_do_ze"
 engine = create_engine(
     "mysql+pymysql://admin:senaiead@172.16.22.76/ferragens_do_ze"
 )
 
 
-# NOVA FUNÇÃO: Limpa o terminal para focar a atenção do usuário
+# FUNÇÃO: Limpa o terminal para melhorar a experiência visual do usuário
 def limpar_tela():
+    # 'cls' é usado no Windows (nt), 'clear' é usado no Linux/Mac
     os.system("cls" if os.name == "nt" else "clear")
 
 
-# NOVA FUNÇÃO: Recarrega os dados para que o Pandas sempre veja o estoque atualizado
+# FUNÇÃO: Sincroniza os dados da memória com o banco de dados
 def atualizar_estoque_memoria():
-    global estoque, ids_validos
+    global estoque, ids_validos  # Define as variáveis como globais para serem acessadas em todo o script
+    # Lê a tabela do banco de dados e joga em um DataFrame do Pandas
     estoque = pd.read_sql_query("SELECT * FROM Produtos", engine)
+    # Cria uma lista com todos os IDs existentes para validações rápidas
     ids_validos = estoque["Id"].tolist()
 
 
-# Inicializa os dados
+# Inicialização dos dados na primeira execução do script
 atualizar_estoque_memoria()
 
 
+# FUNÇÃO: Exibe o menu principal no console
 def menu():
     limpar_tela()
     print(f"""
@@ -43,10 +50,14 @@ def menu():
     """)
 
 
+# Renderiza o menu inicial antes de entrar no laço de repetição
 menu()
+
+# Loop principal da aplicação
 while True:
     pag1 = input("Selecione a opção desejada: ")
 
+    # Validação para garantir que o usuário digitou um número inteiro
     try:
         pag1 = int(pag1)
     except ValueError:
@@ -54,12 +65,13 @@ while True:
         continue
 
     # ----------------------------------------
-    # OPÇÃO 1: ADICIONAR ESTOQUE
+    # OPÇÃO 1: ADICIONAR QUANTIDADE AO ESTOQUE EXISTENTE
     # ----------------------------------------
     if pag1 == 1:
         while True:
             limpar_tela()
             print(f"--- ADICIONAR AO ESTOQUE ---\n")
+            # Exibe o estoque atual sem os índices numéricos do Pandas
             print(estoque.to_string(index=False))
             print(f"\n{funcoes.mostrar_linha()}")
 
@@ -67,24 +79,28 @@ while True:
                 "Selecione o Id do item ou -1 para retornar ao menu: "
             )
 
+            # Garante que o ID digitado é um número inteiro
             try:
                 id_add = int(id_add)
             except ValueError:
                 input("ID inválido! Pressione Enter para tentar novamente...")
                 continue
 
+            # Se o usuário digitar -1, recarrega o menu principal e sai deste loop
             if id_add == -1:
                 menu()
                 break
 
+            # Verifica se o ID informado realmente existe no banco de dados
             if id_add not in ids_validos:
                 print(f"ID {id_add} não encontrado no estoque.")
                 input("Pressione Enter para tentar novamente...")
                 continue
 
-            # Pega o nome do produto para o usuário ter certeza do que está fazendo
+            # Localiza e armazena o nome do produto selecionado pelo ID
             nome_produto = estoque.loc[estoque["Id"] == id_add, "Nome"].values[0]
 
+            # Sub-loop para capturar e validar a quantidade a ser adicionada
             while True:
                 print(f"\n-> Produto Selecionado: {nome_produto}")
                 add = input(
@@ -99,22 +115,26 @@ while True:
                 if add == -1:
                     break
 
+                # Impede a entrada de valores negativos ou zerados
                 if add <= 0:
                     print("A quantidade deve ser maior que zero!")
                     continue
 
+                # Descobre a quantidade atual em estoque e soma com a nova quantidade
                 qtd_atual = estoque.loc[estoque["Id"] == id_add, "Quantidade"].values[0]
                 nova_qtd = qtd_atual + add
 
+                # Prepara a Query SQL utilizando Named Parameters (:parametro) contra SQL Injection
                 sql = text(
                     "UPDATE Produtos SET Quantidade = :nova_qtd WHERE Id = :id_add"
                 )
                 valores = {"nova_qtd": nova_qtd, "id_add": id_add}
 
+                # Executa a transação no banco de dados e commita automaticamente com o gerenciador de contexto (with)
                 with engine.begin() as conexao:
                     conexao.execute(sql, valores)
 
-                # CRUCIAL: Atualiza a memória do Pandas com o novo valor do banco
+                # Atualiza o DataFrame em memória com os novos dados salvos
                 atualizar_estoque_memoria()
 
                 print(f"\nSucesso! {add} unidades adicionadas a '{nome_produto}'.")
@@ -122,7 +142,7 @@ while True:
                 break
 
     # ----------------------------------------
-    # OPÇÃO 2: REMOVER ESTOQUE
+    # OPÇÃO 2: REMOVER QUANTIDADE DO ESTOQUE
     # ----------------------------------------
     elif pag1 == 2:
         while True:
@@ -172,6 +192,7 @@ while True:
 
                 qtd_atual = estoque.loc[estoque["Id"] == id_rmv, "Quantidade"].values[0]
 
+                # Regra de negócio: Impede que o estoque fique negativo
                 if qtd_atual - remove < 0:
                     print(f"Saldo insuficiente! Estoque atual de '{nome_produto}' é apenas {qtd_atual} unidades.")
                     continue
@@ -192,14 +213,15 @@ while True:
                 break
     
     # ----------------------------------------
-    # OPÇÃO 3: CADASTRAR NOVO PRODUTO
+    # OPÇÃO 3: CADASTRAR UM PRODUTO TOTALMENTE NOVO
     # ----------------------------------------
     elif pag1 == 3:
-        salvou = False # Sinalizador para desarmar os loops externos
+        salvou = False  # Flag (sinalizador) para interromper os múltiplos loops encadeados ao finalizar o cadastro
         while True:
             limpar_tela()
             print(f"--- CADASTRAR NOVO PRODUTO ---\n")
             nome = input('Digite o nome do item ou -1 para retornar: ').strip()
+            
             if nome == '-1':
                 menu()
                 break
@@ -208,23 +230,27 @@ while True:
                 input("Pressione Enter para tentar novamente...")
                 continue
                 
+            # Loop para a inserção e validação do preço
             while True:
                 preco = input('Digite o preço ou -1 para retornar: ').strip()
                 if preco == '-1':
                     break
                 try:
+                    # Permite que o usuário digite vírgula substituindo-a por ponto (padrão do Python)
                     preco = float(preco.replace(',', '.'))
                 except ValueError:
                     print("Digite apenas números e use ponto para centavos (Ex: 12.50).")
                     input("Aperte Enter para tentar novamente... ")
                     continue
                 
+                # Mapeia e extrai as categorias únicas existentes no estoque atual para o usuário escolher
                 categorias = pd.Series(estoque['Categoria'].unique())
                 
+                # Loop para seleção da categoria do produto
                 while True:
                     limpar_tela()
                     print("--- CATEGORIAS DISPONÍVEIS ---")
-                    print(categorias.to_string(index=True))
+                    print(categorias.to_string(index=True))  # Exibe a lista de categorias com um índice (0, 1, 2...)
                     print(funcoes.mostrar_linha())
                     
                     id_categoria = input('Selecione a categoria do produto ou -1 pra retornar: ').strip()
@@ -237,6 +263,7 @@ while True:
                         
                     try:
                         id_categoria = int(id_categoria)
+                        # Garante que o índice selecionado está dentro dos limites da lista de categorias
                         if id_categoria < 0 or id_categoria >= len(categorias):
                             print("Número de categoria inválido!")
                             input("Pressione Enter para tentar novamente...")
@@ -246,8 +273,10 @@ while True:
                         input("Pressione Enter para continuar...")
                         continue
 
+                    # Resgata o nome textual da categoria escolhida pelo índice
                     categoria = categorias.iloc[id_categoria]
                     
+                    # Loop para inserção da quantidade inicial do novo produto
                     while True:
                         limpar_tela()
                         print(f'CATEGORIA ESCOLHIDA: {categoria}\n')
@@ -265,7 +294,7 @@ while True:
                             input('Pressione Enter para tentar novamente...')
                             continue
                         
-                        # 4. TELA DE CONFIRMAÇÃO EM MENU
+                        # TELA DE CONFIRMAÇÃO: Exibe um resumo de tudo que foi coletado antes de salvar
                         limpar_tela()
                         print(f"""--- CONFIRMAÇÃO DOS DADOS ---
 PRODUTO:   {nome}
@@ -279,6 +308,7 @@ VOLUME:    {quantidade}
                         
                         opcao_final = input("Selecione a opção desejada: ").strip()
                         
+                        # Opção 1: Grava os dados definitivamente no banco de dados
                         if opcao_final == "1":
                             sql_insert = text("""
                                 INSERT INTO Produtos (Nome, Preco, Categoria, Quantidade)
@@ -292,40 +322,42 @@ VOLUME:    {quantidade}
                                 "quantidade": quantidade
                             }
                             
-                            # Executa usando a mesma engine das opções 1 e 2
                             with engine.begin() as conexao:
                                 conexao.execute(sql_insert, valores_insert)
                             
-                            
-                            
+                            # Sincroniza a memória local com a nova inserção
                             atualizar_estoque_memoria()
                             
                             print("\n✔ Produto adicionado com sucesso!")
                             input("Pressione Enter para voltar ao menu principal...")
-                            salvou = True
+                            salvou = True  # Ativa a flag para quebrar as estruturas de repetição superiores
                             break
                             
+                        # Opção 2: Aborta a operação atual
                         elif opcao_final == "2":
                             print("\n❌ Cadastro cancelado pelo usuário.")
                             input("Pressione Enter para voltar...")
-                            salvou = True # Também sai de tudo para voltar ao menu limpo
+                            salvou = True  # Ativa a flag para retornar diretamente ao menu principal
                             break
                         else:
                             print("Opção inválida!")
                             input("Pressione Enter para tentar novamente...")
                             continue
-                    if salvou: break
-                if salvou: break
+                    
+                    if salvou: break  # Quebra o loop da Quantidade
+                if salvou: break      # Quebra o loop da Categoria
             if salvou: 
-                menu()
-                break
+                menu()                # Redesenha o menu inicial e limpa a tela
+                break                 # Quebra o loop do Nome do produto
                 
     # ----------------------------------------
-    # OPÇÃO 4: SAIR DO PROGRAMA
+    # OPÇÃO 4: FINALIZAR APLICAÇÃO
     # ----------------------------------------
     elif pag1 == 4:
         print('Saindo do programa...')
-        break
+        break  # Interrompe o loop principal 'while True', fechando o programa
+        
+    # Tratamento para opções numéricas inválidas digitadas no menu principal
     else:
         print("Opção inválida!")
         input("Pressione Enter para tentar novamente...")
