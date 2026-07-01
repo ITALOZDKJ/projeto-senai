@@ -2,7 +2,7 @@
 from datetime import datetime
 import os  # Biblioteca usada para interagir com o sistema operacional (ex: limpar terminal)
 from sqlalchemy import create_engine, text  # Usado para criar a conexão e formatar queries SQL de forma segura
-import Hackaton.funcoes as funcoes  # Módulo personalizado contendo funções auxiliares (ex: mostrar_linha)
+import funcoes  # Módulo personalizado contendo funções auxiliares (ex: mostrar_linha)
 import pandas as pd  # Usado para manipular e visualizar os dados em formato de DataFrame
 import pymysql.cursors  # Driver de conexão para bancos MySQL
 
@@ -45,7 +45,8 @@ def menu():
         [1] para adicionar item no estoque
         [2] para remover item do estoque
         [3] para adicionar um novo item no estoque
-        [4] para sair do programa
+        [4] para exibir o estoque
+        [5] para sair do programa
         {funcoes.mostrar_linha()}
     """)
 
@@ -297,14 +298,14 @@ while True:
                         # TELA DE CONFIRMAÇÃO: Exibe um resumo de tudo que foi coletado antes de salvar
                         limpar_tela()
                         print(f"""--- CONFIRMAÇÃO DOS DADOS ---
-PRODUTO:   {nome}
-PREÇO:     R$ {preco:.2f}
-CATEGORIA: {categoria}
-VOLUME:    {quantidade}
-{funcoes.mostrar_linha()}
-[1] Confirmar e Salvar no Sistema
-[2] Cancelar e Voltar
-{funcoes.mostrar_linha()}""")
+                                PRODUTO:   {nome}
+                                PREÇO:     R$ {preco:.2f}
+                                CATEGORIA: {categoria}
+                                VOLUME:    {quantidade}
+                                {funcoes.mostrar_linha()}
+                                [1] Confirmar e Salvar no Sistema
+                                [2] Cancelar e Voltar
+                                {funcoes.mostrar_linha()}""")
                         
                         opcao_final = input("Selecione a opção desejada: ").strip()
                         
@@ -354,6 +355,11 @@ VOLUME:    {quantidade}
     # OPÇÃO 4: FINALIZAR APLICAÇÃO
     # ----------------------------------------
     elif pag1 == 4:
+        print(estoque.to_string(index=False))
+        print(f"\n{funcoes.mostrar_linha()}")
+        
+    elif pag1 == 5:
+
         print('Saindo do programa...')
         break  # Interrompe o loop principal 'while True', fechando o programa
         

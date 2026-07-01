@@ -1,7 +1,7 @@
 #Execução do código
 
 import pymysql.cursors
-import funcoes
+import Hackaton.funcoes as funcoes
 import pandas as pd
 from zoneinfo import ZoneInfo
 from datetime import datetime
